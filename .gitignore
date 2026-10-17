@@ -1,0 +1,15 @@
+# ビルド成果物
+*.elf
+*.hex
+*.o
+*.map
+
+# エディタ/ツールのキャッシュ
+.cache/
+compile_commands.json
+
+# KiCad
+*-backups/
+*.kicad_prl
+fp-info-cache
+_autosave-*
