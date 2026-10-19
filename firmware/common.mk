@@ -4,6 +4,7 @@
 #   TARGET := blink
 #   SRCS   := main.c
 #   include ../common.mk
+#   (共通の部品を使う場合: SRCS := main.c ../common/uart.c)
 #
 # 使い方: make              (ビルド)
 #         make flash        (UPDIで書き込み)
@@ -35,7 +36,10 @@ PROGRAMMER ?= serialupdi
 PORT       ?= /dev/ttyUSB0
 BAUD       ?=
 
-CFLAGS  := -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Os -Wall -ffunction-sections -fdata-sections
+# firmware/common/ (共通の部品。uart.c など) をインクルードパスに入れる
+COMMON_DIR := $(dir $(lastword $(MAKEFILE_LIST)))common
+
+CFLAGS  := -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Os -Wall -ffunction-sections -fdata-sections -I$(COMMON_DIR)
 LDFLAGS := -mmcu=$(MCU) -Wl,--gc-sections
 
 all: $(TARGET).hex size

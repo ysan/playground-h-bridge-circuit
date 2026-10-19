@@ -6,25 +6,6 @@
 - UPDI書き込み手段: SerialUPDI (USB-シリアル変換アダプタ + ダイオード + 470Ω。下記参照)
 - Docker (または Podman)
 
-## SerialUPDI の配線
-
-[burariweb.info の解説](https://burariweb.info/wp-content/uploads/2023/06/arduino-updi-writing-method-37.png) の回路を参考にしています。
-FTDI FT232RL 系のUSB-TTL変換アダプタを使い、TXDとRXDを次のようにまとめてUPDIピンにつなぎます。
-
-```
-USB-TTL                                  ATtiny1604
-  RXD -------------+------[ 470Ω ]------- UPDI (PA0)
-                   |
-  TXD ------|<------+                     (ダイオード: 線の側 = カソードがTXD)
-  VCC ------------------------------------ VCC
-  GND ------------------------------------ GND
-```
-
-UPDIは1本の線で送受信する半二重通信なので、TXDはダイオードを介して合流させ、RXDで自分の送信波形も読み戻します。
-FT232RQ モジュールのVCC出力は5V固定で、ATtiny1604もこの5Vで動かします。
-モジュールの切替スイッチは、信号線 (TXD/RXD) の電圧を選びます。ATtiny1604が5Vで動くため、信号線も5Vに合わせます (出荷時の設定から変更)。信号線が3.3Vのままだと、UPDIの入力がHighと認識される電圧 (電源の約70% = 3.5V) に届かず、書き込みが不安定になる可能性があります。
-02 でクロックを20MHzにするためにも、電源5Vが前提です (tinyAVR 1-seriesは20MHz動作に4.5V以上が必要。データシートで要確認)。
-
 ## ATtiny1604 のピン配置 (SOIC-14)
 
 上から見た図で、左上の `*` が1番ピンです。
@@ -57,6 +38,7 @@ TCA0 の出力ピンは [Microchip: TCA Pin Positions](https://onlinedocs.microc
 | PA2 (12番)、PA3 (13番) | LED (`00-blink`)。`01-pwm-led` は PA3 のみ | 00、01 |
 | PA4 (2番) | IRS2003 の HIN (TCA0 WO4) | 02 |
 | PA5 (3番) | IRS2003 の /LIN (TCA0 WO5) | 02 |
+| PB2 (7番)、PB3 (6番) | UART (USART0 の TXD、RXD)。デバッグ用の printf | 00-uart、以降 |
 
 ## ビルド環境
 
@@ -89,6 +71,25 @@ docker exec avr-builder-dev make -C firmware/00-blink  # 入らずに実行す�
 - `--group-add` にはホスト側の `dialout` グループのgidを渡します。
 - Podman (rootless) ではcgroupルールが使えません。`--group-add keep-groups` で動くことが多いです。
 
+## SerialUPDI の配線
+
+[burariweb.info の解説](https://burariweb.info/wp-content/uploads/2023/06/arduino-updi-writing-method-37.png) の回路を参考にしています。
+FT232RQ モジュール (FTDI の USB-シリアル変換) を使い、TXDとRXDを次のようにまとめてUPDIピンにつなぎます。
+
+```
+USB-TTL                                  ATtiny1604
+  RXD -------------+------[ 470Ω ]------- UPDI (PA0)
+                   |
+  TXD ------|<------+                     (ダイオード: 線の側 = カソードがTXD)
+  VCC ------------------------------------ VCC
+  GND ------------------------------------ GND
+```
+
+UPDIは1本の線で送受信する半二重通信なので、TXDはダイオードを介して合流させ、RXDで自分の送信波形も読み戻します。
+FT232RQ モジュールのVCC出力は5V固定で、ATtiny1604もこの5Vで動かします。
+モジュールの切替スイッチは、信号線 (TXD/RXD) の電圧を選びます。ATtiny1604が5Vで動くため、信号線も5Vに合わせます (出荷時の設定から変更)。信号線が3.3Vのままだと、UPDIの入力がHighと認識される電圧 (電源の約70% = 3.5V) に届かず、書き込みが不安定になる可能性があります。
+02 でクロックを20MHzにするためにも、電源5Vが前提です (tinyAVR 1-seriesは20MHz動作に4.5V以上が必要。データシートで要確認)。
+
 ## ビルドと書き込み
 
 コンテナ内で実行します。
@@ -105,8 +106,74 @@ make flash PORT=/host-dev/ttyUSB0 # UPDIで書き込み
 make MCU=attiny404 PART=t404
 ```
 
+## サンプルの配線と動作
+
+| サンプル | 配線 | 動作 |
+|---|---|---|
+| `00-blink` | PA2・PA3 に LED のアノード。カソードはまとめて 470Ω を通して GND へ | 2個のLEDを0.3秒ずつ交互に点灯 |
+| `00-uart` | ジャンパーピンを UART側にする (次の節) | 1秒ごとにカウンタを送信し、受信した文字を送り返す |
+| `01-pwm-led` | PA3 に LED のアノード、カソードは 470Ω を通して GND へ (00 と同じ配線でよい) | PA3 のLEDを PWM でフェード (約1秒で明るく、約1秒で暗く) |
+
+- `00-blink` は同時に光るLEDが1個だけなので、抵抗は共通の1本で足ります。
+- `01-pwm-led` の PWM は、TCA0 の WO3 (PA3) から出します。PA2 には TCA0 の出力がないため、PA2 のLEDはフェードできません。
+
+## UART でのデバッグ (ピンヘッダで切り替え)
+
+UPDI と UART で、FT232RQ モジュールを1つで共用します。3ピンのピンヘッダを2つ (TXD 用と RXD 用) 用意し、ジャンパーピン (ショートピン) を差す位置で、FT232RQ の TXD と RXD の行き先を切り替えます。
+
+```
+                PROG側        共通            UART側
+ RXD 用ヘッダ:   [o]----------[o]------------[o]
+                  |            |              |
+                 (P1)    FT232RQ の RXD   ATtiny1604 の PB2 (7番, TXD)
+
+ TXD 用ヘッダ:   [o]----------[o]------------[o]
+                  |            |              |
+                 (P2)    FT232RQ の TXD   ATtiny1604 の PB3 (6番, RXD)
+```
+
+PROG側のピン (P1、P2) の先は、上の SerialUPDI と同じ配線です。
+
+```
+ (P1) -------------+------[ 470Ω ]------- ATtiny1604 の UPDI (PA0, 10番)
+                   |
+ (P2) ------|<-----+   (ダイオード: 線の側 = カソードが P2)
+```
+
+接続をまとめると、次のとおりです。
+
+| ヘッダ | PROG側のピン | 共通のピン | UART側のピン |
+|---|---|---|---|
+| RXD 用 | UPDI の接続点 (470Ω を通して PA0 へ) | FT232RQ の RXD | ATtiny1604 の PB2 (TXD) |
+| TXD 用 | ダイオードを通して UPDI の接続点へ (カソードがこのピン側) | FT232RQ の TXD | ATtiny1604 の PB3 (RXD) |
+
+- **PROG**: 2つのジャンパーピンを、どちらも PROG側と共通のピンに差します。上の SerialUPDI と同じ配線になり、`make flash` で書き込めます。
+- **UART**: 2つとも、共通と UART側のピンに差し替えます。FT232RQ の RXD が ATtiny1604 の TXD (PB2) へ、FT232RQ の TXD が ATtiny1604 の RXD (PB3) へつながります。
+- ジャンパーピンは隣り合う2本しかつなげないので、PROG側と UART側に同時につながることはありません。設定を間違えてもショートしません。
+- 2×3 のピンヘッダにまとめて、2つのジャンパーピンが並ぶようにすると、向きがそろっているかを確かめやすくなります。
+- PA0 (UPDI) は、マイコンの UART とは別の回路で、プログラムからは使えません。UART は PB2 と PB3 を使います。
+
+使い方:
+
+1. ジャンパーピンを PROG側にして、書き込む (`make flash`)。
+2. ジャンパーピンを UART側に差し替えて、ターミナルソフトでつなぐ。
+
+```sh
+picocom -b 115200 /dev/ttyUSB0
+# 終了は Ctrl-A のあとに Ctrl-X
+```
+
+- picocom は、ホストで実行します。多くの Linux ディストリビューションで、標準のパッケージマネージャーからインストールできます。
+- ホストのユーザーが `/dev/ttyUSB0` を開けない場合は、`sudo picocom -b 115200 /dev/ttyUSB0` で実行するのが手っ取り早いです。普段から使うなら、`dialout` グループに追加すると、`sudo` なしで使えます: `sudo usermod -aG dialout $USER`。反映にはログインし直しが必要です (そのターミナルだけなら `newgrp dialout` ですぐに使えます)。
+
+- 書き込みとターミナルは、同じ `/dev/ttyUSB0` を使うので、同時には使えません。書き込む前に、picocom を終了します。
+- ジャンパーピンが UART側のまま `make flash` すると、書き込みに失敗します (壊れることはありません)。
+- 動作確認用のサンプルは `firmware/00-uart` です。1秒ごとにカウンタを送り、受信した文字を送り返します。
+- ファームウェアからは、`firmware/common/uart.c` の `uart_init(115200)` を呼べば、`printf` の出力が UART に出ます。
+
 ## 書き込みがうまくいかないとき
 
+- まず接続だけ確認する: `avrdude -p t1604 -c serialupdi -P /host-dev/ttyUSB0 -v`。`device signature = 0x1e9425` と出れば、配線と書き込み環境は正常です。
 - `/dev/ttyUSB0` が出ない場合は、**充電専用のUSBケーブル**(データ線が入っていないもの)の可能性があります。見た目では区別できません。FT232RQ モジュールをつないだ状態で確認します。
 
   ```sh
@@ -115,7 +182,6 @@ make MCU=attiny404 PART=t404
   ```
 
   `lsusb` に出なければ、データ対応のケーブルに替えます。`lsusb` に出るのに `/dev/ttyUSB0` がなければ、ケーブルではなくドライバの問題です。長いケーブルやハブ経由では、認識が不安定になることもあります。
-- 接続確認: `avrdude -p t1604 -c serialupdi -P /host-dev/ttyUSB0 -v`
 - ボーレートを変える (指定しない場合はavrdudeの既定値):
 
   ```sh
@@ -126,7 +192,7 @@ make MCU=attiny404 PART=t404
   make flash PORT=/host-dev/ttyUSB0 BAUD=57600
   ```
 
-  動作確認した範囲 (FT232RL + ダイオード + 470Ω、`00-blink` の書き込みと照合まで):
+  動作確認した範囲 (FT232RQ + ダイオード + 470Ω、`00-blink` の書き込みと照合まで):
 
   | ボーレート | 結果 |
   |---|---|
@@ -136,7 +202,3 @@ make MCU=attiny404 PART=t404
   配線の長さやアダプタによって上限は変わるため、目安として扱ってください。
 - `ttyUSB0` の番号が変わる場合は、`ls /dev/serial/by-id/` で固有のパスを調べ、`PORT=/host-dev/serial/by-id/...` を指定します。
 - 開けない場合は、ホスト側で `ls -l /dev/ttyUSB0` を見て所有グループを確認し、`--group-add` に合わせます。
-
-## 動作確認
-
-`00-blink` は PA2・PA3 に接続した2個のLEDを、0.3秒ずつ交互に点灯させます。各LEDのアノードをピンに、カソードをまとめて470Ωを通してGNDにつなぎます。

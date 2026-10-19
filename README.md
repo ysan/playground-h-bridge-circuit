@@ -9,15 +9,16 @@ DCモーター用のHブリッジ回路を自作し、ATtiny1604 (tinyAVR 1-seri
 
 | # | テーマ | 回路 | ファームウェア | 資料 |
 |---|--------|------|----------------|------|
-| 00 | 開発環境の確認 (LED点滅) | - | [firmware/00-blink](firmware/00-blink) | [docs/00-setup.md](docs/00-setup.md) |
-| 01 | Hブリッジの基礎 | - | - | [docs/01-h-bridge-basics.md](docs/01-h-bridge-basics.md) |
-| 01 | PWMの練習 (PA3のLEDをフェード) | - | [firmware/01-pwm-led](firmware/01-pwm-led) | - |
+| 00 | 開発環境の確認 (LED点滅、UART) | - | [firmware/00-blink](firmware/00-blink)、[firmware/00-uart](firmware/00-uart) | [docs/00-setup.md](docs/00-setup.md) |
+| 01 | Hブリッジの基礎と、PWMの練習 (PA3のLEDをフェード) | - | [firmware/01-pwm-led](firmware/01-pwm-led) | [docs/01-h-bridge-basics.md](docs/01-h-bridge-basics.md) |
 | 02 | ハーフブリッジ (IRS2003 + 2SK4017) | 設計済み (未製作) | [firmware/02-half-bridge](firmware/02-half-bridge) (ビルドのみ確認) | [docs/02-half-bridge.md](docs/02-half-bridge.md) |
-| 03 | Hブリッジ (ハーフブリッジ2組) と正転・逆転・ブレーキ | 未着手 | 未着手 | 未着手 |
+| 03 | Hブリッジ (ハーフブリッジ2組) と正転・逆転・ブレーキ。モーターを回す | 未着手 | 未着手 | 未着手 |
 | 04 | PWMによる速度制御 (TCA0)。Sign-Magnitude と Lock-Antiphase の比較 | - | 未着手 | 未着手 |
-| 05 | 電流検出・エンコーダによるフィードバック制御 (PID) | 未着手 | 未着手 | 未着手 |
+| 05 | 電流検出・エンコーダによるフィードバック制御 (PID)。速度制御から位置制御へ | 未着手 | 未着手 | 未着手 |
 
 回路構成の順序は予定であり、進めながら変更する可能性があります。
+
+540 や 775 のような大きなモーターは、このハーフブリッジ (2SK4017、ブレッドボード) では電流が足りません。MOSFET の強化、基板化、電流保護 (05) の後の発展として扱う予定です。
 
 ## 使用部品
 
@@ -29,6 +30,7 @@ DCモーター用のHブリッジ回路を自作し、ATtiny1604 (tinyAVR 1-seri
 | ショットキーバリアダイオード | SBM245L (45V 2A) | ブートストラップ・還流 |
 | USBシリアル変換 | FT232RQ モジュール | UPDI書き込み |
 | 電源 | 安定化電源 (30V 12A) | モーター電源・ゲート電源 |
+| モーター | 12V の 370 サイズのギヤードモーター (エンコーダ付き。想定、未購入) | 03〜05 で使用 |
 
 IRS2003 は Infineon が新規設計に推奨していない品種で、2SK4017 も生産終了扱いの情報があります。
 学習用として使っていますが、新規に作る場合は後継品 (IRS2007 など) の検討を勧めます。
@@ -39,14 +41,16 @@ IRS2003 は Infineon が新規設計に推奨していない品種で、2SK4017 
 docker/     ビルド・書き込み用のDockerfile
 firmware/   ATtiny1604のファームウェア (テーマごとにディレクトリ)
   common.mk   共通のビルド設定
+  common/     共通の部品 (UART など)
 docs/       解説資料
 hardware/   回路図・基板データ (予定: KiCad)
+tools/      資料の図を生成するスクリプト
 ```
 
 ## 使用環境
 
 - マイコン: ATtiny1604 (UPDIで書き込み)
-- 書き込み: SerialUPDI (USB-シリアル変換 + 抵抗) など。avrdudeを使用
+- 書き込み: SerialUPDI (USB-シリアル変換 + ダイオード + 470Ω)。avrdudeを使用
 - ビルド: avr-gcc / avr-libc (2.1以降が必要)。Dockerイメージで用意しています
 
 セットアップの詳細は [docs/00-setup.md](docs/00-setup.md) を参照してください。

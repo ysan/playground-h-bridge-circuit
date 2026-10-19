@@ -8,8 +8,9 @@
  * 待機状態は HIN=0, /LIN=1 で、上下とも OFF。
  *
  * 動作:
- *   1. 静的テスト: OFF -> LOのみON -> OFF -> (LO 5ms ON -> HO 20ms ON) を20回 -> OFF
+ *   1. 静的テスト: OFF -> LOのみON -> OFF -> (LO 5ms ON -> HO 10ms ON) を20回 -> OFF
  *                  HOは長時間ONにできない (C_bootが空になる) ので、短いパルスにする。
+ *                  10msのとき、C_bootの電圧低下は約1.7V (ICの消費電流とR_gs_H 100kΩの分)。
  *   2. PWMテスト : 約19.5kHz、デューティを 10% から 90% まで往復。
  *                  HINと/LINに同じ波形を出すと、/LINが反転入力なので
  *                  HOとLOは相補になる。デッドタイムはIC内蔵 (標準520ns)。
@@ -114,8 +115,8 @@ int main(void)
     for (uint8_t i = 0; i < 20; i++) {
       bridge_low_on();   _delay_ms(5);    /* C_bootを充電 */
       bridge_off();      _delay_us(10);   /* デッドタイム (ICの内蔵分に加えて) */
-      bridge_high_on();  _delay_ms(20);
-      bridge_off();      _delay_ms(75);
+      bridge_high_on();  _delay_ms(10);
+      bridge_off();      _delay_ms(85);
     }
     _delay_ms(1000);
 
