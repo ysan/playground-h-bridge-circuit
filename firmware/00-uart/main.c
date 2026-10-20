@@ -4,7 +4,7 @@
  * - 1秒ごとに、カウンタを printf で送る
  * - 文字を受信したら、その文字を送り返す
  *
- * FT232RQ とは、ピンヘッダのジャンパーピンを UART側にしてつなぐ (docs/00-setup.md)。
+ * FT232RQ の RXD を PB2 へ、TXD を PB3 へ、ケーブルを差し替えてつなぐ (docs/00-uart.md)。
  * PC 側 (ホスト): picocom -b 115200 /dev/ttyUSB0  (終了は Ctrl-A Ctrl-X)
  */
 #include <avr/io.h>
