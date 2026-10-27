@@ -4,7 +4,10 @@
 *.o
 *.map
 
-# エディタ/ツールのキャッシュ
+# エディタ/ツールのキャッシュ、一時ファイル
+*.swp
+*.swo
+*~
 .cache/
 compile_commands.json
 
