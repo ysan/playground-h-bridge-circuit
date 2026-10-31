@@ -129,9 +129,28 @@ static void go_off_with_deadtime(void)
   _delay_us(10);  /* デッドタイム (ICの内蔵分に加えて) */
 }
 
+/*
+ * 高側のラッチを OFF にそろえる。
+ * IRS2003 の高側は、HIN が変化したときのパルスでしか ON/OFF が切り替わらず、
+ * 電源を入れた直後や配線の誤りのあとは、ラッチが ON のまま残ることがある
+ * (docs/02-half-bridge.md 7.1 の 1-2 の記録)。その状態で低側をONにすると、
+ * 上下が同時にONになる。そこで、低側をONにする前に HIN を 0 -> 1 -> 0 と変化させ、
+ * 最後に「OFF にせよ」のパルスを高側に送る。
+ * 低側は OFF のまま行うので、高側が一瞬 (数µs) ONになっても短絡はしない。
+ */
+static void ho_force_off(void)
+{
+  PORTA.OUTSET = HIN_bm;   /* /LIN=1 (低側OFF) のまま */
+  _delay_us(2);
+  PORTA.OUTCLR = HIN_bm;
+  _delay_us(2);            /* ターンオフの遅れ (標準150ns) とデッドタイム (標準520ns) より長く待つ */
+}
+
 static void bridge_low_on(void)  /* LOのみON: /LIN=0, HIN=0 */
 {
   go_off_with_deadtime();
+  ho_force_off();
+  _delay_us(10);
   PORTA.OUTCLR = HIN_bm | LIN_bm;
   led_state(LED_LEVEL_LOW_ON);
 }
@@ -367,6 +386,7 @@ int main(void)
 
   timer_init();
   bridge_off();
+  ho_force_off();                 /* 12V が先に入っている場合に備えて、起動時にも1回 */
   uart_init(115200);
   sei();                          /* 割り込みを有効にする */
 
