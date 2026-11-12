@@ -107,6 +107,8 @@ make flash PORT=/host-dev/ttyUSB0 # UPDIで書き込み
 make MCU=attiny404 PART=t404
 ```
 
+`make` のときに表示される `Program` と `Data` (フラッシュと SRAM の使用量) の意味や、ビルドしたプログラムがメモリのどこに置かれるかは、[00-memory-map.md](00-memory-map.md) にあります。
+
 ## サンプルの配線と動作
 
 | サンプル | 配線 | 動作 |
@@ -154,8 +156,10 @@ make MCU=attiny404 PART=t404
 - `ttyUSB0` の番号が変わる場合は、`ls /dev/serial/by-id/` で固有のパスを調べ、`PORT=/host-dev/serial/by-id/...` を指定します。
 - 開けない場合は、ホスト側で `ls -l /dev/ttyUSB0` を見て所有グループを確認し、`--group-add` に合わせます。
 
-## 次に: UART でのデバッグ
+## 次に読む資料
 
 書き込んだプログラムと PC の間で文字をやりとりする (UART、printf) 方法は、[00-uart.md](00-uart.md) にあります。
+
+ビルドしたプログラムが、フラッシュと SRAM のどこに置かれるかは、[00-memory-map.md](00-memory-map.md) にあります。
 
 波形の確認に使うオシロスコープの使い方 (画面の取り込みなど) は、[00-oscilloscope.md](00-oscilloscope.md) にあります。

@@ -9,9 +9,9 @@ DCモーター用のHブリッジ回路を自作し、ATtiny1604 (tinyAVR 1-seri
 
 | # | テーマ | 回路 | ファームウェア | 資料 |
 |---|--------|------|----------------|------|
-| 00 | 開発環境の確認 (LED点滅、UART) | - | [firmware/00-blink](firmware/00-blink)、[firmware/00-uart](firmware/00-uart) | [docs/00-setup.md](docs/00-setup.md)、[docs/00-uart.md](docs/00-uart.md)、[docs/00-memory-map.md](docs/00-memory-map.md)、[docs/00-oscilloscope.md](docs/00-oscilloscope.md) |
+| 00 | 開発環境の確認 (LED点滅、UART、メモリ配置、オシロ) | - | [firmware/00-blink](firmware/00-blink)、[firmware/00-uart](firmware/00-uart) | [docs/00-setup.md](docs/00-setup.md)、[docs/00-uart.md](docs/00-uart.md)、[docs/00-memory-map.md](docs/00-memory-map.md)、[docs/00-oscilloscope.md](docs/00-oscilloscope.md) |
 | 01 | Hブリッジの基礎と、PWMの練習 (PA3のLEDをフェード) | - | [firmware/01-pwm-led](firmware/01-pwm-led)、[firmware/01-pwm-led-intr](firmware/01-pwm-led-intr)、[firmware/01-adc-pot](firmware/01-adc-pot) | [docs/01-h-bridge-basics.md](docs/01-h-bridge-basics.md) |
-| 02 | ハーフブリッジ (IRS2003 + 2SK4017) | 設計済み (未製作) | [firmware/02-half-bridge](firmware/02-half-bridge) (ビルドのみ確認) | [docs/02-half-bridge.md](docs/02-half-bridge.md) |
+| 02 | ハーフブリッジ (IRS2003 + 2SK4017) | 設計済み (未製作) | [firmware/02-half-bridge](firmware/02-half-bridge) (ビルドのみ確認) | [docs/02-half-bridge.md](docs/02-half-bridge.md)、[docs/02-half-bridge-test.md](docs/02-half-bridge-test.md) (動作確認) |
 | 03 | Hブリッジ (ハーフブリッジ2組) と正転・逆転・ブレーキ。モーターを回す | 未着手 | 未着手 | 未着手 |
 | 04 | PWMによる速度制御 (TCA0)。Sign-Magnitude と Lock-Antiphase の比較 | - | 未着手 | 未着手 |
 | 05 | 電流検出・エンコーダによるフィードバック制御 (PID)。速度制御から位置制御へ | 未着手 | 未着手 | 未着手 |
