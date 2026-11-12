@@ -157,3 +157,5 @@ make MCU=attiny404 PART=t404
 ## 次に: UART でのデバッグ
 
 書き込んだプログラムと PC の間で文字をやりとりする (UART、printf) 方法は、[00-uart.md](00-uart.md) にあります。
+
+波形の確認に使うオシロスコープの使い方 (画面の取り込みなど) は、[00-oscilloscope.md](00-oscilloscope.md) にあります。
