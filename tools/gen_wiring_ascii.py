@@ -158,7 +158,7 @@ def stage2():
     vline(CX, qL + 5, qL + 6); put(qL + 6, CX - 1, "GND")
     put(o + 7, CX + 1, "---- Load ---- GND")
     # HO -> Rg_H -> Q_H.G、R_gs_H (100k) を G と S の間に
-    hline(o + 3, IR, QX); put(o + 3, QX - 9, "[Rg_H]"); g[o + 3][QX - 2] = "*"
+    hline(o + 3, IR, QX); put(o + 3, QX - 8, "[47]"); g[o + 3][QX - 2] = "*"
     vline(QX - 2, o + 4, o + 6); g[o + 6][QX - 2] = "+"; put(o + 6, QX - 1, "-[100k]"); g[o + 6][CX] = "*"
     # VS -> 中点
     hline(o + 4, IR, C_VS); g[o + 4][C_VS] = "+"
@@ -166,7 +166,7 @@ def stage2():
     # LO -> Rg_L -> Q_L.G、R_gs_L (10k) を G と S の間に
     hline(o + 5, IR, C_LO); g[o + 5][C_LO] = "+"
     vline(C_LO, o + 6, qL + 2); g[qL + 2][C_LO] = "+"
-    hline(qL + 2, C_LO + 1, QX); put(qL + 2, QX - 9, "[Rg_L]"); g[qL + 2][QX - 2] = "*"
+    hline(qL + 2, C_LO + 1, QX); put(qL + 2, QX - 8, "[47]"); g[qL + 2][QX - 2] = "*"
     vline(QX - 2, qL + 3, qL + 5); g[qL + 5][QX - 2] = "+"; put(qL + 5, QX - 1, "-[10k]-"); g[qL + 5][CX] = "*"
     # C_bus (ネットラベルでつなぐ)
     cb = CX + 11
