@@ -12,7 +12,7 @@
 import sys
 
 # ---------------------------------------------------------------- 共通の描画
-H, W = 40, 130
+H, W = 40, 160
 g = [[" "] * W for _ in range(H)]
 
 
@@ -109,9 +109,10 @@ def logic_side():
     put(o - 1, cv - 17, "C_vcc 10u+0.1u")
 
 
-def bootstrap():
+def bootstrap(cvb=C_VB, cvs=C_VS):
     """D_boot (VB から上へ) と C_boot (VB から下へ。下側は呼び出し側で VS へつなぐ)。"""
     o = O
+    C_VB, C_VS = cvb, cvs
     put(o + 2, IR, "----")
     vline(C_VB, o, o + 2); g[o + 2][C_VB] = "*"
     put(o - 1, C_VB - 2, "-----"); g[o - 2][C_VB] = "v"; vline(C_VB, o - 4, o - 2)
@@ -143,39 +144,50 @@ def stage1():
 
 
 def stage2():
+    """段階 2。IRS2003 の右側の縦線 (LO、VS、C_boot) と MOSFET の間を広く取る。
+    VS の線は、C_boot の縦線より左で下に降ろし、C_boot の下側に左から合流させる
+    (VS の線が C_boot の縦線をくぐらないように)。"""
     o = O
+    cl, cs, cvb = IR + 2, IR + 6, IR + 12    # LO、VS、C_boot の縦線の列
+    QX = IR + 32; CX = QX + 6                # MOSFET の箱の左端、D/S の列
+    mid = o + 9                              # 中点の横線の行 (C_boot の下側と同じ行)
     logic_side()
-    bootstrap()
-    QX = IR + 15; CX = QX + 6
+    bootstrap(cvb, cvb + 1)
+    hline(o + 2, IR, cvb)                    # VB -> C_boot
+    # C_boot の記号を 1行上げる (o+7,o+8 -> o+6,o+7)。名前も記号の横へ
+    put(o + 8, cvb - 1, " | "); put(o + 8, cvb + 3, " " * 9)
+    put(o + 6, cvb - 1, "---"); put(o + 7, cvb - 1, "---"); put(o + 6, cvb + 3, "C_boot 1u")
 
     def qbox(top, name):
         put(top, QX, "+-----+-----+"); put(top + 1, QX, "| D         |")
         put(top + 2, QX, "| G   " + name + "   |"); put(top + 3, QX, "| S         |"); put(top + 4, QX, "+-----+-----+")
-    qH, qL = o + 1, o + 9
+    qH, qL = o + 1, o + 11
     qbox(qH, "Q_H"); qbox(qL, "Q_L")
     put(o, CX - 2, "+12V")
-    vline(CX, qH + 5, o + 7); g[o + 7][CX] = "*"; vline(CX, o + 8, qL)
-    vline(CX, qL + 5, qL + 6); put(qL + 6, CX - 1, "GND")
-    put(o + 7, CX + 1, "---- Load ---- GND")
+    # Q_H.S -> 中点 -> Q_L.D
+    vline(CX, qH + 5, qL); g[mid][CX] = "*"
+    put(mid, CX + 1, "---- Load ---- GND")
     # HO -> Rg_H -> Q_H.G、R_gs_H (100k) を G と S の間に
-    hline(o + 3, IR, QX); put(o + 3, QX - 8, "[47]"); g[o + 3][QX - 2] = "*"
-    vline(QX - 2, o + 4, o + 6); g[o + 6][QX - 2] = "+"; put(o + 6, QX - 1, "-[100k]"); g[o + 6][CX] = "*"
-    # VS -> 中点
-    hline(o + 4, IR, C_VS); g[o + 4][C_VS] = "+"
-    vline(C_VS, o + 5, o + 9); g[o + 7][C_VS] = "*"; hline(o + 7, C_VS + 1, CX)
+    gx = QX - 3
+    hline(o + 3, IR, QX); put(o + 3, gx - 10, "[47]"); g[o + 3][gx] = "*"
+    vline(gx, o + 4, o + 7); g[o + 7][gx] = "+"; hline(o + 7, gx + 1, CX); put(o + 7, gx + 2, "[100k]"); g[o + 7][CX] = "*"
+    # VS -> 下へ -> C_boot の下側 -> 中点
+    hline(o + 4, IR, cs); g[o + 4][cs] = "+"
+    vline(cs, o + 5, mid); g[mid][cs] = "+"
+    hline(mid, cs + 1, CX); g[mid][cvb] = "*"; g[mid][CX] = "*"
     # LO -> Rg_L -> Q_L.G、R_gs_L (10k) を G と S の間に
-    hline(o + 5, IR, C_LO); g[o + 5][C_LO] = "+"
-    vline(C_LO, o + 6, qL + 2); g[qL + 2][C_LO] = "+"
-    hline(qL + 2, C_LO + 1, QX); put(qL + 2, QX - 8, "[47]"); g[qL + 2][QX - 2] = "*"
-    vline(QX - 2, qL + 3, qL + 5); g[qL + 5][QX - 2] = "+"; put(qL + 5, QX - 1, "-[10k]-"); g[qL + 5][CX] = "*"
+    hline(o + 5, IR, cl); g[o + 5][cl] = "+"
+    vline(cl, o + 6, qL + 2); g[qL + 2][cl] = "+"
+    hline(qL + 2, cl + 1, QX); put(qL + 2, gx - 10, "[47]"); g[qL + 2][gx] = "*"
+    vline(gx, qL + 3, qL + 6); g[qL + 6][gx] = "+"; hline(qL + 6, gx + 1, CX); put(qL + 6, gx + 2, "[10k]"); g[qL + 6][CX] = "*"
+    vline(CX, qL + 5, qL + 6); vline(CX, qL + 7, qL + 8); put(qL + 8, CX - 1, "GND")
     # C_bus (ネットラベルでつなぐ)
-    cb = CX + 11
+    cb = CX + 20
     put(o - 4, cb - 2, "+12V"); g[o - 3][cb] = "|"
     put(o - 2, cb - 1, "---"); put(o - 1, cb - 1, "---")
     g[o][cb] = "|"; put(o + 1, cb - 1, "GND"); put(o - 2, cb + 3, "C_bus 100u+0.1u")
-    # C_boot の縦線が HO、VS の横線と交差する箇所は、縦線を優先して描く
-    for r in (o + 3, o + 4):
-        g[r][C_VB] = "|"
+    # C_boot の縦線が HO の横線と交差する箇所は、縦線を優先して描く (接続しない)
+    g[o + 3][cvb] = "|"
 
 
 if __name__ == "__main__":
