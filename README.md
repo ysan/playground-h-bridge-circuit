@@ -10,11 +10,11 @@ DCモーター用のHブリッジ回路を自作し、ATtiny1604 (tinyAVR 1-seri
 | # | テーマ | 回路 | ファームウェア | 資料 |
 |---|--------|------|----------------|------|
 | 00 | 開発環境の確認 (LED点滅、UART、メモリ配置、オシロ) | - | [firmware/00-blink](firmware/00-blink)、[firmware/00-uart](firmware/00-uart) | [docs/00-setup.md](docs/00-setup.md)、[docs/00-uart.md](docs/00-uart.md)、[docs/00-memory-map.md](docs/00-memory-map.md)、[docs/00-oscilloscope.md](docs/00-oscilloscope.md) |
-| 01 | Hブリッジの基礎と、PWMの練習 (PA3のLEDをフェード) | - | [firmware/01-pwm-led](firmware/01-pwm-led)、[firmware/01-pwm-led-intr](firmware/01-pwm-led-intr)、[firmware/01-adc-pot](firmware/01-adc-pot) | [docs/01-h-bridge-basics.md](docs/01-h-bridge-basics.md) |
-| 02 | ハーフブリッジ (IRS2003 + 2SK4017) | 段階 1 (MOSFET なし) を確認済み | [firmware/02-half-bridge](firmware/02-half-bridge) (段階 1 で動作確認) | [docs/02-half-bridge.md](docs/02-half-bridge.md)、[docs/02-half-bridge-test.md](docs/02-half-bridge-test.md) (動作確認) |
-| 03 | Hブリッジ (ハーフブリッジ2組) と正転・逆転・ブレーキ。モーターを回す | 未着手 | 未着手 | 未着手 |
+| 01 | Hブリッジの基礎と、PWM・ADC の練習 (PA3 の LED のフェード、ボリュームの読み取り) | - | [firmware/01-pwm-led](firmware/01-pwm-led)、[firmware/01-pwm-led-intr](firmware/01-pwm-led-intr)、[firmware/01-adc-pot](firmware/01-adc-pot) | [docs/01-h-bridge-basics.md](docs/01-h-bridge-basics.md) |
+| 02 | ハーフブリッジ (IRS2003 + 2SK4017)。モーターを一方向に回す | 段階 3 (モーター) まで確認済み | [firmware/02-half-bridge](firmware/02-half-bridge) (段階 3 まで動作確認) | [docs/02-half-bridge.md](docs/02-half-bridge.md)、[docs/02-half-bridge-test.md](docs/02-half-bridge-test.md) (動作確認) |
+| 03 | Hブリッジ (ハーフブリッジ2組) と、モーターの正転・逆転・ブレーキ | 未着手 | 未着手 | 未着手 |
 | 04 | PWMによる速度制御 (TCA0)。Sign-Magnitude と Lock-Antiphase の比較 | - | 未着手 | 未着手 |
-| 05 | 電流検出・エンコーダによるフィードバック制御 (PID)。速度制御から位置制御へ | 未着手 | 未着手 | 未着手 |
+| 05 | 電流検出・エンコーダによるフィードバック制御 (PID)。速度制御から位置制御へ (エンコーダ付きのモーターを別に用意する予定) | 未着手 | 未着手 | 未着手 |
 
 回路構成の順序は予定であり、進めながら変更する可能性があります。
 
@@ -27,9 +27,10 @@ DCモーター用のHブリッジ回路を自作し、ATtiny1604 (tinyAVR 1-seri
 | マイコン | ATtiny1604 (SOIC-14、変換基板に実装) | 制御 |
 | ハーフブリッジゲートドライバ | IRS2003S (SOIC-8、変換基板を使用) | MOSFETの駆動 |
 | Nch パワーMOSFET | 2SK4017(Q) (60V 5A、4V駆動) | スイッチ |
-| ショットキーバリアダイオード | SBM245L (45V 2A) | ブートストラップ・還流 |
-| USBシリアル変換 | FT232RQ モジュール | UPDI書き込み |
-| 電源 | 安定化電源 (30V 12A) | モーター電源・ゲート電源 |
+| ショットキーバリアダイオード | SBM245L (45V 2A) | ブートストラップ (D_boot) |
+| USBシリアル変換 | FT232RQ モジュール | UPDI書き込み、UART (printf) |
+| 電源 | 安定化電源 (30V 12A) | モーター電源・ゲート電源 (12V で使用) |
+| オシロスコープ | RIGOL DS1102Z-E (2チャンネル) | 波形の確認 ([docs/00-oscilloscope.md](docs/00-oscilloscope.md)) |
 | モーター | 25GA-370 (12V、200RPM の減速ギア付き。エンコーダなし) | 02 の段階 3 から使用 |
 
 IRS2003 は Infineon が新規設計に推奨していない品種で、2SK4017 も生産終了扱いの情報があります。
