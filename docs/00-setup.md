@@ -38,7 +38,7 @@ TCA0 の出力ピンは [Microchip: TCA Pin Positions](https://onlinedocs.microc
 | PA2 (12番)、PA3 (13番) | LED。02 では動作中の目印 (PA2) と状態表示 (PA3) に使う | 00、01、02 |
 | PA4 (2番) | IRS2003 の HIN (TCA0 WO4) | 02 |
 | PA5 (3番) | IRS2003 の /LIN (TCA0 WO5) | 02 |
-| PA6 (4番) | ADC (AIN6)。半固定ボリューム (10kΩ、TSR-3386T) のワイパー | 01-adc-pot |
+| PA6 (4番) | ADC (AIN6)。ボリュームのワイパー (01 は半固定 10kΩ の TSR-3386T、02 は B カーブ 2kΩ) | 01-adc-pot、02 (`v` コマンド) |
 | PB2 (7番)、PB3 (6番) | UART (USART0 の TXD、RXD)。デバッグ用の printf ([00-uart.md](00-uart.md)) | 00-uart、以降 |
 
 ## ビルド環境

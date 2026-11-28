@@ -5,6 +5,7 @@
  *   PA4 (TCA0 WO4) -> IRS2003 HIN   (正論理: 1 で HO がON)
  *   PA5 (TCA0 WO5) -> IRS2003 /LIN  (負論理: 0 で LO がON)
  *   PB2 (TXD), PB3 (RXD) -> UART (115200bps)。picocom などからコマンドを送る
+ *   PA6 (AIN6) <- ボリュームのワイパー (両端は +5V と GND)。v コマンドで使う
  *   PA2 -> LED: 0.5秒ごとに点滅 (ファームウェアが動いている目印)
  *   PA3 (TCA0 WO3) -> LED: ハーフブリッジの状態を明るさで示す
  *        全OFF: 消灯 / 低側のみON: 薄く点灯 / 高側ON: 最大 / PWM: デューティと同じ明るさ
@@ -18,8 +19,10 @@
  *   s    : 静的テストを1周 (全OFF -> 低側のみON -> 全OFF -> 高側パルス20回 -> 全OFF)
  *   1-9  : PWM。デューティを 10%〜90% で固定 (約19.5kHz)
  *   p    : PWM スイープを1往復 (10% -> 90% -> 10%、各1秒)
+ *   v    : ボリュームモード。PA6 のボリュームでデューティを 0〜90% で変える
+ *          (5% 未満は全OFF。急に回しても 10ms ごとに 1% ずつしか変えない)
  *   ?    : コマンドの一覧と状態を表示
- * テスト (h, s, p) の実行中に何かキーを押すと、全OFFにして止まる
+ * テスト (h, s, p) とボリュームモード (v) の実行中に何かキーを押すと、全OFFにして止まる
  * (そのキーはコマンドとして実行しない)。
  *
  * 時間の管理:
@@ -46,6 +49,10 @@
 
 #define PWM_PERIOD    256u   /* 20MHz / 4 / 256 = 約19.5kHz */
 #define DUTY_MAX_PCT  90u    /* ブートストラップコンデンサを充電する時間を残す */
+
+#define POT_STEP_MS     10u   /* ボリュームモードで、ADC を読んでデューティを動かす間隔 */
+#define POT_PRINT_STEPS 20u   /* 何回ごとに表示するか (20 x 10ms = 0.2秒) */
+#define POT_OFF_PCT     5u    /* これ未満は全OFF (0 付近の遊びと合わせて、確実に止める) */
 
 #define LED_LEVEL_LOW_ON  16   /* 低側のみON のときの PA3 の明るさ (0..255) */
 #define LED_LEVEL_HIGH_ON 255  /* 高側ON のとき */
@@ -99,6 +106,28 @@ static void timer_init(void)
   TCB0.CTRLB   = TCB_CNTMODE_INT_gc;
   TCB0.INTCTRL = TCB_CAPT_bm;
   TCB0.CTRLA   = TCB_CLKSEL_CLKDIV1_gc | TCB_ENABLE_bm;
+}
+
+static void adc_init(void)
+{
+  /* PA6 はアナログ入力として使うので、デジタル入力の回路を切る (雑音と消費電流を減らす) */
+  PORTA.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;
+
+  /* 基準電圧は VDD (5V)。ADC のクロックは 1.5MHz 以下にする必要があるので、
+   * 20MHz / 16 = 1.25MHz にする (01-adc-pot は 3.33MHz / 4)。 */
+  ADC0.CTRLC  = ADC_SAMPCAP_bm | ADC_REFSEL_VDDREF_gc | ADC_PRESC_DIV16_gc;
+  ADC0.CTRLB  = ADC_SAMPNUM_ACC8_gc;          /* 8回分を足し合わせる */
+  ADC0.MUXPOS = ADC_MUXPOS_AIN6_gc;           /* PA6 */
+  ADC0.CTRLA  = ADC_RESSEL_10BIT_gc | ADC_ENABLE_bm;
+}
+
+/* 1回分 (8回の積算) を変換して、平均 (0〜1023) を返す。100µs 弱かかる */
+static uint16_t adc_read(void)
+{
+  ADC0.COMMAND = ADC_STCONV_bm;
+  while (!(ADC0.INTFLAGS & ADC_RESRDY_bm))
+    ;
+  return ADC0.RES / 8;    /* RES を読むとフラグも消える */
 }
 
 /* ---------------------------------------------------------------- 出力の状態 */
@@ -217,7 +246,7 @@ static void pwm_duty(unsigned duty_pct)
 
 /* ---------------------------------------------------------------- テスト (状態機械) */
 
-typedef enum { SEQ_NONE, SEQ_STATIC, SEQ_SWEEP, SEQ_HPULSE } seq_t;
+typedef enum { SEQ_NONE, SEQ_STATIC, SEQ_SWEEP, SEQ_HPULSE, SEQ_POT } seq_t;
 
 static seq_t    seq = SEQ_NONE;
 static uint8_t  step;          /* 今の段階 */
@@ -299,6 +328,52 @@ static void hpulse_enter(uint8_t s)
   }
 }
 
+/*
+ * ボリュームモード: 10ms ごとに ADC を読み、目標のデューティ (0〜90%) を決める。
+ * 今のデューティは、目標に向かって 1回に 1% ずつしか動かさない。止まったモーターに
+ * いきなり高いデューティがかかって、回り始めの大きな電流 (2〜4A) が流れるのを防ぐ。
+ * 急に下げたときに、モーターが発電して電源へ押し戻す電流 (回生) も小さくなる。
+ * POT_OFF_PCT 未満は全OFF。表示は pwm_duty() を使わずに、0.2秒ごとにまとめて出す。
+ */
+static unsigned pot_pct;       /* 今のデューティ (%) */
+
+static void pot_apply(void)
+{
+  if (pot_pct < POT_OFF_PCT) {
+    if (pwm_running)
+      bridge_off();
+    return;
+  }
+  uint8_t cmp = pct_to_cmp(pot_pct);
+  if (pwm_running)
+    pwm_set(cmp);
+  else
+    pwm_start(cmp);           /* 全OFF からは、C_boot を充電してから始める */
+  led_state(cmp);
+  duty_pct_now = pot_pct;
+}
+
+static void pot_step(void)
+{
+  uint16_t adc = adc_read();
+  unsigned target = (uint32_t)adc * DUTY_MAX_PCT / 1023;
+  if (target < POT_OFF_PCT)
+    target = 0;
+
+  if (pot_pct < target)
+    pot_pct++;
+  else if (pot_pct > target)
+    pot_pct--;
+  pot_apply();
+
+  if (++count >= POT_PRINT_STEPS) {
+    count = 0;
+    printf("pot: adc=%4u target=%2u%% duty=%2u%%%s\n", adc, target, pot_pct,
+           pwm_running ? "" : " (all OFF)");
+  }
+  wait_until(POT_STEP_MS);
+}
+
 static void seq_start(seq_t s)
 {
   seq = s;
@@ -307,6 +382,12 @@ static void seq_start(seq_t s)
   case SEQ_STATIC: printf("static test: start\n"); static_enter(0); break;
   case SEQ_SWEEP:  printf("PWM sweep: start\n"); sweep_enter(0);  break;
   case SEQ_HPULSE: hpulse_enter(0); break;
+  case SEQ_POT:
+    printf("pot mode: start (turn the pot on PA6, press any key to stop)\n");
+    bridge_off();
+    pot_pct = 0;
+    pot_step();
+    break;
   default: break;
   }
 }
@@ -320,6 +401,7 @@ static void seq_poll(void)
   case SEQ_STATIC: static_next();           break;
   case SEQ_SWEEP:  sweep_enter(step + 1);   break;
   case SEQ_HPULSE: hpulse_enter(step + 1);  break;
+  case SEQ_POT:    pot_step();              break;
   default: break;
   }
 }
@@ -342,8 +424,9 @@ static void print_help(void)
   printf(" s    : run the static test once\n");
   printf(" 1-9  : PWM, fixed duty 10-90%%\n");
   printf(" p    : PWM sweep (10%% -> 90%% -> 10%%)\n");
+  printf(" v    : pot mode, duty 0-90%% from the pot on PA6 (below 5%%: all OFF)\n");
   printf(" ?    : show this help\n");
-  printf("Press any key during a test to stop it (all OFF)\n");
+  printf("Press any key during a test or the pot mode to stop it (all OFF)\n");
   printf("LED: PA2 blinks while running, PA3 shows the state (brightness = duty in PWM)\n");
   if (pwm_running)
     printf("state: PWM %u%%\n", duty_pct_now);
@@ -365,6 +448,7 @@ static void handle(int c)
   case 'h': seq_start(SEQ_HPULSE); break;
   case 's': seq_start(SEQ_STATIC); break;
   case 'p': seq_start(SEQ_SWEEP);  break;
+  case 'v': seq_start(SEQ_POT);    break;
   case '?': print_help(); break;
   case '\r': case '\n': break;
   default:
@@ -385,6 +469,7 @@ int main(void)
   PORTA.DIRSET = HIN_bm | LIN_bm | LED_HEARTBEAT_bm | LED_STATE_bm;
 
   timer_init();
+  adc_init();
   bridge_off();
   ho_force_off();                 /* 12V が先に入っている場合に備えて、起動時にも1回 */
   uart_init(115200);
